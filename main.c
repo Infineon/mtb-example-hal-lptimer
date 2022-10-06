@@ -8,7 +8,7 @@
 *
 *
 *******************************************************************************
-* Copyright 2019-2021, Cypress Semiconductor Corporation (an Infineon company) or
+* Copyright 2019-2022, Cypress Semiconductor Corporation (an Infineon company) or
 * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
 * This software, including source code, documentation and related
@@ -51,7 +51,6 @@
 ********************************************************************************/
 #define GPIO_INTERRUPT_PRIORITY (7u)
 
-
 /*******************************************************************************
 * Function Prototypes
 ********************************************************************************/
@@ -59,14 +58,13 @@ void handle_error(void);
 static void gpio_interrupt_handler(void *handler_arg, cyhal_gpio_event_t event);
 void enter_deepsleep(void);
 
-
 /*******************************************************************************
 * Global Variables
 ********************************************************************************/
 cyhal_lptimer_t lptimer_obj;
 cyhal_lptimer_info_t lptimer_obj_info;
 volatile bool gpio_intr_flag = false;
-
+cyhal_gpio_callback_data_t gpio_btn_callback_data; 
 
 /*******************************************************************************
 * Function Name: main
@@ -93,6 +91,14 @@ int main(void)
 
     /* The time between two presses of switch */
     uint32_t timegap;
+
+    #if defined (CY_DEVICE_SECURE)
+    cyhal_wdt_t wdt_obj;
+    /* Clear watchdog timer so that it doesn't trigger a reset */
+    result = cyhal_wdt_init(&wdt_obj, cyhal_wdt_get_max_timeout_ms());
+    CY_ASSERT(CY_RSLT_SUCCESS == result);
+    cyhal_wdt_free(&wdt_obj);
+    #endif
 
     /* Initialize the device and board peripherals */
     result = cybsp_init();
@@ -124,7 +130,10 @@ int main(void)
     }
 
     /* Configure GPIO interrupt */
-    cyhal_gpio_register_callback(CYBSP_USER_BTN, gpio_interrupt_handler, NULL);
+    gpio_btn_callback_data.callback = gpio_interrupt_handler;
+
+    /* Configure GPIO interrupt */
+    cyhal_gpio_register_callback(CYBSP_USER_BTN, &gpio_btn_callback_data);
     cyhal_gpio_enable_event(CYBSP_USER_BTN, CYHAL_GPIO_IRQ_FALL,
                             GPIO_INTERRUPT_PRIORITY, true);
 
@@ -223,7 +232,7 @@ int main(void)
 *  cyhal_gpio_irq_event_t (unused)
 *
 *******************************************************************************/
-static void gpio_interrupt_handler(void *handler_arg, cyhal_gpio_irq_event_t event)
+static void gpio_interrupt_handler(void *handler_arg, cyhal_gpio_event_t event)
 {
     gpio_intr_flag = true;
 }
@@ -251,7 +260,7 @@ void enter_deepsleep(void)
         cyhal_gpio_write(CYBSP_USER_LED, CYBSP_LED_STATE_OFF);
 
         /* Enter deep sleep mode */
-        result = cyhal_system_deepsleep();
+        result = cyhal_syspm_deepsleep();
 
         /* System failed to enter deep sleep mode. Stop program execution */
         if (result != CY_RSLT_SUCCESS)
