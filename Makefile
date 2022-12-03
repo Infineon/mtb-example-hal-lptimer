@@ -38,17 +38,15 @@ MTB_TYPE=COMBINED
 
 # Target board/hardware (BSP).
 # To change the target, it is recommended to use the Library manager
-# ('make modlibs' from command line), which will also update Eclipse IDE launch
-# configurations. If TARGET is manually edited, ensure TARGET_<BSP>.mtb with a
-# valid URL exists in the application, run 'make getlibs' to fetch BSP contents
-# and update or regenerate launch configurations for your IDE.
+# ('make library-manager' from command line), which will also update Eclipse IDE launch
+# configurations.
 TARGET=CY8CPROTO-062-4343W
 
 # Name of application (used to derive name of final linked file).
 #
 # If APPNAME is edited, ensure to update or regenerate launch
 # configurations for your IDE.
-APPNAME=mtb-example-psoc6-lptimer
+APPNAME=mtb-example-hal-lptimer
 
 # Name of toolchain to use. Options include:
 #

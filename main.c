@@ -1,13 +1,13 @@
-/******************************************************************************
+/*******************************************************************************
 * File Name:   main.c
 
-* Description: This is the source code for the PSoC 6 MCU Low-Power Timer
-*              Example for ModusToolbox.
+* Description: This is the source code for Low-Power Timer Example for
+*              ModusToolbox.
 *
 * Related Document: See README.md
 *
 *
-*******************************************************************************
+********************************************************************************
 * Copyright 2019-2022, Cypress Semiconductor Corporation (an Infineon company) or
 * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
@@ -40,7 +40,9 @@
 * so agrees to indemnify Cypress against all liability.
 *******************************************************************************/
 
-#include "cy_pdl.h"
+/*******************************************************************************
+* Header Files
+*******************************************************************************/
 #include "cyhal.h"
 #include "cybsp.h"
 #include "cy_retarget_io.h"
@@ -48,32 +50,39 @@
 
 /*******************************************************************************
 * Macros
-********************************************************************************/
+*******************************************************************************/
 #define GPIO_INTERRUPT_PRIORITY (7u)
 
-/*******************************************************************************
-* Function Prototypes
-********************************************************************************/
-void handle_error(void);
-static void gpio_interrupt_handler(void *handler_arg, cyhal_gpio_event_t event);
-void enter_deepsleep(void);
 
 /*******************************************************************************
 * Global Variables
-********************************************************************************/
+*******************************************************************************/
 cyhal_lptimer_t lptimer_obj;
 cyhal_lptimer_info_t lptimer_obj_info;
 volatile bool gpio_intr_flag = false;
-cyhal_gpio_callback_data_t gpio_btn_callback_data; 
+cyhal_gpio_callback_data_t gpio_btn_callback_data;
+
+
+/*******************************************************************************
+* Function Prototypes
+*******************************************************************************/
+void handle_error(uint32_t status);
+static void gpio_interrupt_handler(void *handler_arg, cyhal_gpio_event_t event);
+void enter_deepsleep(void);
+
+
+/*******************************************************************************
+* Function Definitions
+*******************************************************************************/
 
 /*******************************************************************************
 * Function Name: main
 ********************************************************************************
 * Summary:
-* This is the main function for CM4 CPU. lptimer HAL APIs are used to work with
-* the MCWDT block. The main loop waits till the button switch is pressed. Once 
-* pressed, it reads the timer value and gets the difference in time between the 
-* last two switch press events. It then prints the time over UART.
+* This is the main function, lptimer HAL APIs are used to work with the MCWDT
+* block. The main loop waits till the button switch is pressed. Once pressed, it
+* reads the timer value and gets the difference in time between the last two
+* switch press events. It then prints the time over UART.
 *
 * Parameters:
 *  none
@@ -102,32 +111,20 @@ int main(void)
 
     /* Initialize the device and board peripherals */
     result = cybsp_init();
-
     /* BSP initialization failed. Stop program execution */
-    if (result != CY_RSLT_SUCCESS)
-    {
-        CY_ASSERT(0);
-    }
+    handle_error(result);
 
     /* Initialize the User LED */
     result = cyhal_gpio_init(CYBSP_USER_LED, CYHAL_GPIO_DIR_OUTPUT,
                              CYHAL_GPIO_DRIVE_STRONG, CYBSP_LED_STATE_OFF);
-
     /* GPIO initialization failed. Stop program execution */
-    if (result != CY_RSLT_SUCCESS)
-    {
-        CY_ASSERT(0);
-    }
+    handle_error(result);
 
     /* Initialize the User button */
     result = cyhal_gpio_init(CYBSP_USER_BTN, CYHAL_GPIO_DIR_INPUT,
-                             CYHAL_GPIO_DRIVE_PULLUP, 1);
-
+                CYBSP_USER_BTN_DRIVE, CYBSP_BTN_OFF);
     /* GPIO initialization failed. Stop program execution */
-    if (result != CY_RSLT_SUCCESS)
-    {
-        handle_error();
-    }
+    handle_error(result);
 
     /* Configure GPIO interrupt */
     gpio_btn_callback_data.callback = gpio_interrupt_handler;
@@ -143,29 +140,21 @@ int main(void)
     /* Initialize retarget-io to use the debug UART port */
     result = cy_retarget_io_init(CYBSP_DEBUG_UART_TX, CYBSP_DEBUG_UART_RX,
                                  CY_RETARGET_IO_BAUDRATE);
-
     /* retarget-io initialization failed. Stop program execution */
-    if (result != CY_RSLT_SUCCESS)
-    {
-        handle_error();
-    }
+    handle_error(result);
 
     /* Print a message on UART */
     /* \x1b[2J\x1b[;H - ANSI ESC sequence for clear screen */
     printf("\x1b[2J\x1b[;H");
 
     printf("****************** "
-           "PSoC 6 MCU: Low-Power Timer Example "
+           "HAL: Low-Power Timer Example "
            "****************** \r\n\n");
 
     /* Initialize the LPTIMER */
     result = cyhal_lptimer_init(&lptimer_obj);
-
     /* LPTIMER initialization failed. Stop program execution */
-    if (result != CY_RSLT_SUCCESS)
-    {
-        handle_error();
-    }
+    handle_error(result);
 
     /* Initialize event count value */
     event1_cnt = 0;
@@ -175,16 +164,19 @@ int main(void)
     cyhal_lptimer_get_info(&lptimer_obj, &lptimer_obj_info);
 
     printf("lptimer info:\r\n");
-    printf("\t frequency_hz = %lu\r\n", (unsigned long)lptimer_obj_info.frequency_hz);
-    printf("\t min_set_delay = %d\r\n", lptimer_obj_info.min_set_delay);
-    printf("\t max_counter_value = %lu\r\n", (unsigned long)lptimer_obj_info.max_counter_value);
+    printf("frequency_hz = %lu\r\n",
+            (unsigned long)lptimer_obj_info.frequency_hz);
+    printf("min_set_delay = %d\r\n",
+            lptimer_obj_info.min_set_delay);
+    printf("max_counter_value = %lu\r\n",
+            (unsigned long)lptimer_obj_info.max_counter_value);
 
-    printf("\r\nPress the user button to display the time between two presses of"
-           " the user button. \r\n");
+    printf("\r\nPress the user button to display the time between two presses "
+            "of the user button.\r\n");
 
     for (;;)
     {
-        /* Check the interrupt status which indicates if the switch is pressed */
+        /*Check the interrupt status which indicates if the switch is pressed*/
         if (true == gpio_intr_flag)
         {
             gpio_intr_flag = false;
@@ -193,29 +185,25 @@ int main(void)
             event1_cnt = event2_cnt;
 
             /* Consider the current switch press as 2nd switch press event and 
-             * Get counter value from LPTIMER. 
-             */
+             * Get counter value from LPTIMER. */
             event2_cnt = cyhal_lptimer_read(&lptimer_obj);
 
-            /* Calculate the time between two presses of switch and print on the 
-             * terminal. LPTIMER is clocked by LFClk.
-             */
+            /* Calculate the time between two presses of switch and print on the
+             * terminal. LPTIMER is clocked by LFClk. */
             if (event2_cnt > event1_cnt)
             {
-                timegap = (event2_cnt - event1_cnt) / (lptimer_obj_info.frequency_hz);
+                timegap = (event2_cnt-event1_cnt)/(lptimer_obj_info.frequency_hz);
 
                 /* Print the timegap value */
-                printf("\r\nThe time between two presses of user button = %d\r\n",
-                       (unsigned int)timegap);
+                printf("\r\nThe time between two presses of user button = %d\r"
+                        "\n", (unsigned int)timegap);
             }
             else /* counter overflow */
             {
                 /* Print a message on overflow of counter */
                 printf("\r\n\r\nCounter overflow detected\r\n");
             }
-            
         }
-
         enter_deepsleep();
     }
 }
@@ -228,8 +216,11 @@ int main(void)
 *   GPIO interrupt handler.
 *
 * Parameters:
-*  void *handler_arg (unused)
-*  cyhal_gpio_irq_event_t (unused)
+*  void *handler_arg
+*  cyhal_gpio_irq_event_t
+*
+* Return:
+*  static void
 *
 *******************************************************************************/
 static void gpio_interrupt_handler(void *handler_arg, cyhal_gpio_event_t event)
@@ -246,14 +237,17 @@ static void gpio_interrupt_handler(void *handler_arg, cyhal_gpio_event_t event)
 *   and then puts the system to deep sleep mode.
 *
 * Parameters:
-*  void - unused
+*  void
+*
+* Return:
+*  void
 *
 *******************************************************************************/
 void enter_deepsleep(void)
 {
     cy_rslt_t result;
 
-    /*Ensure that the UART has completed its operation */
+    /* Ensure that the UART has completed its operation */
     if (cyhal_uart_is_tx_active(&cy_retarget_io_uart_obj) == false)
     {
         /* Turn OFF LED to indicate UART is not in use */
@@ -263,18 +257,13 @@ void enter_deepsleep(void)
         result = cyhal_syspm_deepsleep();
 
         /* System failed to enter deep sleep mode. Stop program execution */
-        if (result != CY_RSLT_SUCCESS)
-        {
-            handle_error();
-        }
-        
+        handle_error(result);
     }
     else
     {
         /* Turn ON LED to indicate UART is in use */
         cyhal_gpio_write(CYBSP_USER_LED, CYBSP_LED_STATE_ON);
     }
-
 }
 
 
@@ -282,27 +271,21 @@ void enter_deepsleep(void)
 * Function Name: handle_error
 ********************************************************************************
 * Summary:
-* This function processes unrecoverable errors such as UART initialization error.
-* In case of such error the system will turn on LED and halt the CPU.
+* User defined error handling function
 *
 * Parameters:
-*  void
+*  uint32_t status - status indicates success or failure
 *
 * Return:
-*  None
+*  void
 *
 *******************************************************************************/
-void handle_error(void)
+void handle_error(uint32_t status)
 {
-    /* Disable all interrupts */
-    __disable_irq();
-
-    /* Turn on LED to indicate error */
-    cyhal_gpio_write(CYBSP_USER_LED, CYBSP_LED_STATE_ON);
-
-    /* Halt the CPU */
-    CY_ASSERT(0);
+    if (status != CY_RSLT_SUCCESS)
+    {
+        CY_ASSERT(0);
+    }
 }
-
 
 /* [] END OF FILE */
